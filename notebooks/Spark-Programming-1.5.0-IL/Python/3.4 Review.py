@@ -62,6 +62,7 @@
 # COMMAND ----------
 
 # TODO
+from pyspark.sql.functions import upper, lower, translate, regexp_replace, col
 
 sourceFile = "dbfs:/mnt/training/dataframes/people-with-dups.txt"
 destFile = workingDir + "/people.parquet"
@@ -71,6 +72,49 @@ dbutils.fs.rm(destFile, True)
 
 # Complete your work here...
 
+df = (spark.read
+  .option("sep", ":")
+  .option("header", True)
+  .option("inferSchema", True)
+  .csv(sourceFile)
+)
+
+dedupedDF = (df
+  .select(col("*"),
+      lower(col("firstName")).alias("lcFirstName"),
+      lower(col("lastName")).alias("lcLastName"),
+      lower(col("middleName")).alias("lcMiddleName"),
+      translate(col("ssn"), "-", "").alias("ssnNums")
+      # regexp_replace(col("ssn"), "-", "").alias("ssnNums")
+      # regexp_replace(col("ssn"), """^(\d{3})(\d{2})(\d{4})$""", "$1-$2-$3").alias("ssnNums")
+   )
+  .dropDuplicates(["lcFirstName", "lcMiddleName", "lcLastName", "ssnNums", "gender", "birthDate", "salary"])
+  .drop("lcFirstName", "lcMiddleName", "lcLastName", "ssnNums")
+)
+
+df_cleaned = (df
+             .withColumn('f1', upper('firstName'))
+             .withColumn('s1', regexp_replace('ssn', '-', ''))
+             .dropDuplicates(['f1','s1'])
+             .drop('f1')
+             .drop('s1')
+             )
+
+(df_cleaned.repartition(8)
+   .write
+   .mode("overwrite")
+   .option("compression", "snappy")
+   .parquet(destFile))
+# df.write.format("delta").save(deltaDestFile)
+
+# display(df_cleaned)
+# print(df_cleaned.count())
+df_cleaned.explain(True)
+dedupedDF.explain(True)
+
+# COMMAND ----------
+
+df.rdd.getNumPartitions()
 
 # COMMAND ----------
 
