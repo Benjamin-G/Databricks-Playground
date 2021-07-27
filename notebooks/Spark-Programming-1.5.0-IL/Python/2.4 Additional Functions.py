@@ -61,7 +61,10 @@ display(eventsDF)
 # COMMAND ----------
 
 # TODO
-convertedUsersDF = (salesDF.FILL_IN
+from pyspark.sql.functions import lit
+convertedUsersDF = (salesDF
+                    .dropDuplicates(['email'])
+                    .withColumn('converted', lit(True))
 )
 display(convertedUsersDF)
 
@@ -78,7 +81,14 @@ display(convertedUsersDF)
 # COMMAND ----------
 
 # TODO
-conversionsDF = (usersDF.FILL_IN
+from pyspark.sql.functions import col
+conversionsDF = (usersDF
+                 .join(convertedUsersDF, "email", "outer")
+                 .filter(col("email").isNotNull())
+                 .na.fill(False)
+#                  .join(convertedUsersDF, usersDF.email == convertedUsersDF.email)
+#                  .filter(usersDF.email.isNotNull())
+#                  .fillna(False, ['converted'])
 )
 display(conversionsDF)
 
@@ -95,7 +105,12 @@ display(conversionsDF)
 # COMMAND ----------
 
 # TODO
-cartsDF = (eventsDF.FILL_IN
+from pyspark.sql.functions import explode, collect_set
+display(eventsDF.select('items'))
+cartsDF = (eventsDF
+           .withColumn('items', explode('items'))
+           .groupBy('user_id')
+           .agg(collect_set('items.item_id').alias('cart'))
 )
 display(cartsDF)
 
@@ -110,7 +125,7 @@ display(cartsDF)
 # COMMAND ----------
 
 # TODO
-emailCartsDF = conversionsDF.FILL_IN
+emailCartsDF = conversionsDF.join(cartsDF, 'user_id', 'left')
 display(emailCartsDF)
 
 # COMMAND ----------
@@ -125,7 +140,9 @@ display(emailCartsDF)
 # COMMAND ----------
 
 # TODO
-abandonedCartsDF = (emailCartsDF.FILL_IN
+abandonedCartsDF = (emailCartsDF
+                    .filter(emailCartsDF.converted == False)
+                    .filter(col('cart').isNotNull())
 )
 display(abandonedCartsDF)
 
@@ -137,7 +154,12 @@ display(abandonedCartsDF)
 # COMMAND ----------
 
 # TODO
-abandonedItemsDF = (abandonedCartsDF.FILL_IN
+abandonedItemsDF = (abandonedCartsDF
+#                     .select(explode('cart').alias('items'))
+                    .withColumn("items", explode("cart"))
+                    .groupBy('items')
+                    .count()
+                    .sort('', ascending=False)
 )
 display(abandonedItemsDF)
 
@@ -149,3 +171,6 @@ display(abandonedItemsDF)
 # COMMAND ----------
 
 # MAGIC %run ./Includes/Classroom-Cleanup
+
+# COMMAND ----------
+
