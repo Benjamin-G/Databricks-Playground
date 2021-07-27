@@ -174,7 +174,10 @@ display(df)
 # COMMAND ----------
 
 # TODO
-datetimeDF = (df.FILL_IN
+# datetimeDF = (df.select('user_id', (df.ts / 1000000).cast('timestamp').alias('ts') ), (to_date(col('ts'))).alias('date') )
+datetimeDF = (df
+          .withColumn('ts', (df.ts / 1000000).cast('timestamp'))
+          .withColumn('date', to_date(col('ts')))
 )
 display(datetimeDF)
 
@@ -216,10 +219,23 @@ assert expected1b == result1b, "datetimeDF does not have the expected date value
 
 # COMMAND ----------
 
-# TODO
-activeUsersDF = (datetimeDF.FILL_IN
+from pyspark.sql.functions import approx_count_distinct
+
+activeUsersDF2 = (datetimeDF
+                 .dropDuplicates(['user_id'])
+                 .groupBy('date')
+                 .count()
+                 .withColumnRenamed('count', 'active_users')
+                 .orderBy('date')
+)
+
+activeUsersDF = (datetimeDF
+                 .groupBy('date')
+                 .agg(approx_count_distinct("user_id").alias("active_users"))
+                 .sort('date')
 )
 display(activeUsersDF)
+display(activeUsersDF2)
 
 # COMMAND ----------
 
@@ -256,7 +272,12 @@ assert expected2b == result2b, "activeUsersDF does not have the expected values"
 # COMMAND ----------
 
 # TODO
-activeDowDF = (activeUsersDF.FILL_IN
+from pyspark.sql.functions import dayofweek, date_format, avg
+activeDowDF = (activeUsersDF
+               .withColumn('day', date_format('date', 'E'))
+               .groupBy('day')
+               .agg(avg('active_users').alias('avg_users'))
+#                .withColumn('day', dayofweek('date'))
 )
 display(activeDowDF)
 
@@ -292,3 +313,6 @@ assert expected3b == result3b, "activeDowDF does not have the expected values"
 # COMMAND ----------
 
 # MAGIC %run ./Includes/Classroom-Cleanup
+
+# COMMAND ----------
+
