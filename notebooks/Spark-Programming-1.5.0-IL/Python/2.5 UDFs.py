@@ -193,7 +193,8 @@ def labelDayOfWeek(day):
 # COMMAND ----------
 
 # TODO
-finalDF = FILL_IN
+labelDayOfWeekUDF = udf(labelDayOfWeek)
+finalDF = df.withColumn('day', labelDayOfWeekUDF('day')).sort('day')
 
 display(finalDF)
 
