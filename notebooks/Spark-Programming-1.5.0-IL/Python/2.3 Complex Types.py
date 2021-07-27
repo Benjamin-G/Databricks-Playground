@@ -68,9 +68,10 @@ display(detailsDF)
 
 # COMMAND ----------
 
-mattressDF = (detailsDF.filter(array_contains(col("details"), "Mattress"))
-  .withColumn("size", element_at(col("details"), 2))
-  .withColumn("quality", element_at(col("details"), 1))
+mattressDF = (detailsDF
+  .filter(array_contains("details", "Mattress"))
+  .withColumn("size", element_at("details", 2))
+  .withColumn("quality", element_at("details", 1))
 )
 display(mattressDF)
 
@@ -121,7 +122,8 @@ display(unionDF)
 
 # COMMAND ----------
 
-optionsDF = (unionDF.groupBy("email")
+optionsDF = (unionDF
+  .groupBy("email")
   .agg(collect_set("size").alias("size options"),
        collect_set("quality").alias("quality options"))
 )
@@ -135,3 +137,6 @@ display(optionsDF)
 # COMMAND ----------
 
 # MAGIC %run ./Includes/Classroom-Cleanup
+
+# COMMAND ----------
+
