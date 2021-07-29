@@ -87,6 +87,72 @@
 
 # COMMAND ----------
 
+# MAGIC %sql
+# MAGIC SELECT 
+# MAGIC   dc_id,
+# MAGIC   device_type, 
+# MAGIC   temps,
+# MAGIC   TRANSFORM (temps, t -> ((t * 9) div 5) + 32 ) AS `temps_F`
+# MAGIC FROM device_data;
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC CREATE OR REPLACE TEMPORARY VIEW co2_levels_temporary
+# MAGIC AS
+# MAGIC   SELECT
+# MAGIC     dc_id, 
+# MAGIC     device_type,
+# MAGIC     co2_level,
+# MAGIC     REDUCE(co2_level, 0, (c, acc) -> c + acc, acc ->(acc div size(co2_level))) as average_co2_level,
+# MAGIC     REDUCE(co2_level, 0, (c, acc) -> c + acc) as total_co2_level
+# MAGIC   FROM device_data
+# MAGIC   SORT BY average_co2_level DESC;
+# MAGIC   
+# MAGIC SELECT * FROM co2_levels_temporary
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC SELECT * FROM (
+# MAGIC   SELECT device_type, average_co2_level 
+# MAGIC   FROM co2_levels_temporary
+# MAGIC )
+# MAGIC PIVOT (
+# MAGIC   ROUND(AVG(average_co2_level), 2) AS avg_co2 
+# MAGIC   FOR device_type IN ('sensor-ipad', 'sensor-inest', 
+# MAGIC     'sensor-istick', 'sensor-igauge')
+# MAGIC   );
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC SELECT 
+# MAGIC   dc_id,
+# MAGIC   device_type,
+# MAGIC   ROUND(AVG(average_co2_level)) AS avg_co2_level 
+# MAGIC FROM co2_levels_temporary
+# MAGIC -- WHERE avg_co2_level < 1100
+# MAGIC GROUP BY ROLLUP (dc_id, device_type)
+# MAGIC -- HAVING avg_co2_level > 1100 AND device_type IS NOT NULL
+# MAGIC HAVING device_type IS NOT NULL
+# MAGIC ORDER BY dc_id, device_type
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC select * from co2_levels_temporary where device_type = 'null';
+
+# COMMAND ----------
+
+# Create a view or table
+
+temp_table_name = "data_centers_q2_q3_snappy-1_parquet"
+
+df.createOrReplaceTempView(temp_table_name)
+
+# COMMAND ----------
+
 from pyspark.sql.functions import from_json
 # File location and type
 file_location = "/FileStore/tables/data_centers_q2_q3_snappy-1.parquet"
@@ -105,14 +171,6 @@ df = spark.read.format(file_type) \
   .load(file_location)
 
 display(df)
-
-# COMMAND ----------
-
-# Create a view or table
-
-temp_table_name = "data_centers_q2_q3_snappy-1_parquet"
-
-df.createOrReplaceTempView(temp_table_name)
 
 # COMMAND ----------
 
